@@ -4,19 +4,19 @@ import { supabase } from '../api/supabaseClient'
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(undefined) // undefined = loading
+  const [session, setSession] = useState(undefined) // undefined = still loading
   const [user, setUser] = useState(null)
 
   useEffect(() => {
-    // Get initial session
+    // Get initial session first
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
+      setSession(session ?? null)
       setUser(session?.user ?? null)
     })
 
-    // Listen for auth state changes
+    // Then listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
+      setSession(session ?? null)
       setUser(session?.user ?? null)
     })
 
@@ -35,7 +35,6 @@ export function AuthProvider({ children }) {
       options: { data: { full_name: fullName } },
     })
     if (!error && data.user) {
-      // Create user profile row
       await supabase.from('user_profiles').insert({
         user_id: data.user.id,
         full_name: fullName,
@@ -46,6 +45,8 @@ export function AuthProvider({ children }) {
 
   const signOut = async () => {
     await supabase.auth.signOut()
+    setSession(null)
+    setUser(null)
   }
 
   const loading = session === undefined
