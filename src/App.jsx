@@ -9,6 +9,7 @@ import ProjectDetailPage from './pages/ProjectDetailPage'
 function ProtectedRoute({ children }) {
   const { session, loading } = useAuth()
 
+  // Still waiting for Supabase to return session — show spinner
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-[var(--pilot-surface)]">
@@ -20,14 +21,45 @@ function ProtectedRoute({ children }) {
     )
   }
 
-  if (!session) return <Navigate to="/login" replace />
+  // Session is definitively null — redirect to login
+  if (!session) {
+    return <Navigate to="/login" replace />
+  }
+
+  // Session confirmed — render protected content
+  return children
+}
+
+function PublicRoute({ children }) {
+  const { session, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[var(--pilot-surface)]">
+        <div className="w-8 h-8 border-2 border-[var(--pilot-blue)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  // Already logged in — redirect to dashboard
+  if (session) {
+    return <Navigate to="/dashboard" replace />
+  }
+
   return children
 }
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/login"
+        element={
+          <PublicRoute>
+            <LoginPage />
+          </PublicRoute>
+        }
+      />
       <Route
         path="/"
         element={
