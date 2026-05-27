@@ -1,25 +1,27 @@
-import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import {
+import { Package, useState } from 'react'
+import { Package, useParams, useNavigate } from 'react-router-dom'
+import { Package, useQuery } from '@tanstack/react-query'
+import { Package,
   ArrowLeft, Layers, ShieldAlert, FileText, Users, CalendarDays, Pencil,
 } from 'lucide-react'
-import { getProject } from '../api/projects'
-import { getTeamMembers } from '../api/team_members'
-import { formatDate, STATUS_COLORS, PRIORITY_COLORS, METHODOLOGY_COLORS, cn } from '../lib/utils'
+import { Package, getProject } from '../api/projects'
+import { Package, getTeamMembers } from '../api/team_members'
+import { Package, formatDate, STATUS_COLORS, PRIORITY_COLORS, METHODOLOGY_COLORS, cn } from '../lib/utils'
 import TasksTab from '../components/project-detail/TasksTab'
 import TeamTab from '../components/project-detail/TeamTab'
 import RisksTab from '../components/project-detail/RisksTab'
 import NotesTab from '../components/project-detail/NotesTab'
+import DeliverablesTab from '../components/project-detail/DeliverablesTab'
 import ProjectFormModal from '../components/projects/ProjectFormModal'
-import { updateProject } from '../api/projects'
-import { useQueryClient } from '@tanstack/react-query'
+import { Package, updateProject } from '../api/projects'
+import { Package, useQueryClient } from '@tanstack/react-query'
 
 const TABS = [
   { id: 'tasks', label: 'Tasks', icon: Layers },
   { id: 'team', label: 'Team', icon: Users },
   { id: 'risks', label: 'Risks', icon: ShieldAlert },
   { id: 'notes', label: 'Notes', icon: FileText },
+  { id: 'deliverables', label: 'Deliverables', icon: Package },
 ]
 
 export default function ProjectDetailPage() {
@@ -32,6 +34,12 @@ export default function ProjectDetailPage() {
   const { data: project, isLoading, error } = useQuery({
     queryKey: ['project', id],
     queryFn: () => getProject(id),
+    enabled: !!id,
+  })
+
+  const { data: tasks = [] } = useQuery({
+    queryKey: ['tasks', id],
+    queryFn: () => getTasks(id),
     enabled: !!id,
   })
 
@@ -152,6 +160,7 @@ export default function ProjectDetailPage() {
         {activeTab === 'team' && <TeamTab projectId={id} />}
         {activeTab === 'risks' && <RisksTab projectId={id} />}
         {activeTab === 'notes' && <NotesTab projectId={id} />}
+        {activeTab === 'deliverables' && <DeliverablesTab projectId={id} teamMembers={teamMembers} tasks={tasks} />}
       </div>
 
       {editModalOpen && (
