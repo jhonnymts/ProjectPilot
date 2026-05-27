@@ -1,36 +1,58 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ArrowLeft,
-  CalendarDays,
-  Tag,
-  TrendingUp,
-  Clock,
-  Layers,
+  ArrowLeft, Layers, ShieldAlert, FileText, Users, CalendarDays, Pencil,
 } from 'lucide-react'
 import { getProject } from '../api/projects'
+import { getTeamMembers } from '../api/team_members'
 import { formatDate, STATUS_COLORS, PRIORITY_COLORS, METHODOLOGY_COLORS, cn } from '../lib/utils'
+import TasksTab from '../components/project-detail/TasksTab'
+import TeamTab from '../components/project-detail/TeamTab'
+import RisksTab from '../components/project-detail/RisksTab'
+import NotesTab from '../components/project-detail/NotesTab'
+import ProjectFormModal from '../components/projects/ProjectFormModal'
+import { updateProject } from '../api/projects'
+import { useQueryClient } from '@tanstack/react-query'
 
-function DetailRow({ label, children }) {
-  return (
-    <div className="flex items-start gap-3 py-3 border-b border-[var(--pilot-border)] last:border-0">
-      <span className="text-xs text-muted-foreground/60 uppercase tracking-wide font-medium w-28 shrink-0 pt-0.5">
-        {label}
-      </span>
-      <div className="flex-1 text-sm text-foreground">{children}</div>
-    </div>
-  )
-}
+const TABS = [
+  { id: 'tasks', label: 'Tasks', icon: Layers },
+  { id: 'team', label: 'Team', icon: Users },
+  { id: 'risks', label: 'Risks', icon: ShieldAlert },
+  { id: 'notes', label: 'Notes', icon: FileText },
+]
 
 export default function ProjectDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const qc = useQueryClient()
+  const [activeTab, setActiveTab] = useState('tasks')
+  const [editModalOpen, setEditModalOpen] = useState(false)
 
   const { data: project, isLoading, error } = useQuery({
     queryKey: ['project', id],
     queryFn: () => getProject(id),
     enabled: !!id,
   })
+
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ['team_members', id],
+    queryFn: () => getTeamMembers(id),
+    enabled: !!id,
+  })
+
+  const updateMutation = useQuery({
+    queryKey: ['project', id],
+    queryFn: () => getProject(id),
+    enabled: false,
+  })
+
+  const handleUpdateProject = async (formData) => {
+    await updateProject(id, formData)
+    qc.invalidateQueries({ queryKey: ['project', id] })
+    qc.invalidateQueries({ queryKey: ['projects'] })
+    setEditModalOpen(false)
+  }
 
   if (isLoading) {
     return (
@@ -44,10 +66,7 @@ export default function ProjectDetailPage() {
     return (
       <div className="p-8 text-center">
         <p className="text-muted-foreground text-sm">Project not found.</p>
-        <button
-          onClick={() => navigate('/projects')}
-          className="mt-4 text-sm text-[var(--pilot-blue)] hover:text-blue-300"
-        >
+        <button onClick={() => navigate('/projects')} className="mt-4 text-sm text-[var(--pilot-blue)] hover:text-blue-300">
           ← Back to Projects
         </button>
       </div>
@@ -55,107 +74,95 @@ export default function ProjectDetailPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 max-w-4xl mx-auto space-y-6 animate-fade-in">
+    <div className="p-4 md:p-6 lg:p-8 max-w-5xl mx-auto space-y-6 animate-fade-in">
       {/* Back */}
-      <button
-        onClick={() => navigate('/projects')}
-        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
+      <button onClick={() => navigate('/projects')}
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft size={15} /> Back to Projects
       </button>
 
       {/* Hero */}
-      <div className="pilot-surface rounded-xl p-6">
-        <div className="flex items-start gap-4">
-          <div
-            className="w-4 h-4 rounded-full shrink-0 mt-1.5"
-            style={{ backgroundColor: project.color || '#6366f1' }}
-          />
-          <div className="flex-1 min-w-0">
-            <h1 className="font-display text-xl md:text-2xl font-700 text-foreground leading-tight">
-              {project.name}
-            </h1>
-            {project.description && (
-              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-                {project.description}
-              </p>
-            )}
-            <div className="flex flex-wrap gap-2 mt-4">
-              <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full capitalize', METHODOLOGY_COLORS[project.methodology])}>
-                {project.methodology}
-              </span>
-              <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full capitalize', STATUS_COLORS[project.status])}>
-                {project.status.replace('_', ' ')}
-              </span>
-              <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full capitalize', PRIORITY_COLORS[project.priority])}>
-                {project.priority} priority
-              </span>
+      <div className="pilot-surface rounded-xl p-5 md:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <div className="w-3.5 h-3.5 rounded-full shrink-0 mt-1.5"
+              style={{ backgroundColor: project.color || '#6366f1' }} />
+            <div className="flex-1 min-w-0">
+              <h1 className="font-display text-xl md:text-2xl font-700 text-foreground leading-tight">
+                {project.name}
+              </h1>
+              {project.description && (
+                <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{project.description}</p>
+              )}
+              <div className="flex flex-wrap gap-2 mt-3">
+                <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full capitalize', METHODOLOGY_COLORS[project.methodology])}>
+                  {project.methodology}
+                </span>
+                <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full capitalize', STATUS_COLORS[project.status])}>
+                  {project.status.replace('_', ' ')}
+                </span>
+                <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full capitalize', PRIORITY_COLORS[project.priority])}>
+                  {project.priority} priority
+                </span>
+                {project.target_end_date && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <CalendarDays size={11} /> {formatDate(project.target_end_date)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+          <button onClick={() => setEditModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground border border-[var(--pilot-border)] hover:border-[var(--pilot-border-bright)] rounded-lg transition-all shrink-0">
+            <Pencil size={12} /> Edit
+          </button>
         </div>
 
-        {/* Progress bar */}
-        <div className="mt-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground">Overall Progress</span>
-            <span className="text-sm font-mono font-medium text-foreground">{project.progress_pct ?? 0}%</span>
+        {/* Progress */}
+        <div className="mt-5">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs text-muted-foreground">Progress</span>
+            <span className="text-xs font-mono text-muted-foreground">{project.progress_pct ?? 0}%</span>
           </div>
-          <div className="h-2 rounded-full bg-[var(--pilot-surface-3)] overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-700"
-              style={{
-                width: `${project.progress_pct ?? 0}%`,
-                backgroundColor: project.color || '#6366f1',
-              }}
-            />
+          <div className="h-1.5 rounded-full bg-[var(--pilot-surface-3)] overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-700"
+              style={{ width: `${project.progress_pct ?? 0}%`, backgroundColor: project.color || '#6366f1' }} />
           </div>
         </div>
       </div>
 
-      {/* Details */}
-      <div className="pilot-surface rounded-xl p-5">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">
-          Project Details
-        </p>
-        <DetailRow label="Start Date">
-          {project.start_date ? formatDate(project.start_date) : <span className="text-muted-foreground">—</span>}
-        </DetailRow>
-        <DetailRow label="Target End">
-          {project.target_end_date ? formatDate(project.target_end_date) : <span className="text-muted-foreground">—</span>}
-        </DetailRow>
-        <DetailRow label="Actual End">
-          {project.actual_end_date ? formatDate(project.actual_end_date) : <span className="text-muted-foreground">—</span>}
-        </DetailRow>
-        <DetailRow label="Created">
-          {formatDate(project.created_at?.split('T')[0])}
-        </DetailRow>
-        <DetailRow label="Last Updated">
-          {formatDate(project.updated_at?.split('T')[0])}
-        </DetailRow>
+      {/* Tabs */}
+      <div>
+        <div className="flex gap-1 border-b border-[var(--pilot-border)] mb-5 overflow-x-auto">
+          {TABS.map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-all border-b-2 -mb-px',
+                activeTab === tab.id
+                  ? 'text-[var(--pilot-blue)] border-[var(--pilot-blue)]'
+                  : 'text-muted-foreground border-transparent hover:text-foreground'
+              )}>
+              <tab.icon size={14} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'tasks' && <TasksTab projectId={id} teamMembers={teamMembers} />}
+        {activeTab === 'team' && <TeamTab projectId={id} />}
+        {activeTab === 'risks' && <RisksTab projectId={id} />}
+        {activeTab === 'notes' && <NotesTab projectId={id} />}
       </div>
 
-      {/* Coming soon panels */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {[
-          { icon: Layers, label: 'Tasks', desc: 'Manage tasks and stories — Sprint 2' },
-          { icon: TrendingUp, label: 'Risks', desc: 'Risk register — Sprint 2' },
-          { icon: Clock, label: 'Notes', desc: 'Meeting notes and decisions — Sprint 2' },
-          { icon: Tag, label: 'Team', desc: 'Team members — Sprint 2' },
-        ].map(({ icon: Icon, label, desc }) => (
-          <div
-            key={label}
-            className="pilot-surface rounded-xl p-5 flex items-center gap-3 opacity-50"
-          >
-            <div className="w-9 h-9 rounded-lg bg-[var(--pilot-surface-3)] flex items-center justify-center shrink-0">
-              <Icon size={16} className="text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">{label}</p>
-              <p className="text-xs text-muted-foreground/50">{desc}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+      {editModalOpen && (
+        <ProjectFormModal
+          project={project}
+          onSave={handleUpdateProject}
+          onClose={() => setEditModalOpen(false)}
+          loading={false}
+          error={null}
+        />
+      )}
     </div>
   )
 }
