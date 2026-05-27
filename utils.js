@@ -1,10 +1,44 @@
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from './supabaseClient'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+export async function getTasks(projectId) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('order_index', { ascending: true })
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Check your .env.local file.')
+  if (error) throw error
+  return data
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export async function createTask(payload) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert(payload)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function updateTask(id, payload) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .update(payload)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function deleteTask(id) {
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+}

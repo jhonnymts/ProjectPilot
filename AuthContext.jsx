@@ -1,8 +1,8 @@
 import { supabase } from './supabaseClient'
 
-export async function getDeliverables(projectId) {
+export async function getRisks(projectId) {
   const { data, error } = await supabase
-    .from('deliverables')
+    .from('risks')
     .select('*')
     .eq('project_id', projectId)
     .order('created_at', { ascending: false })
@@ -11,9 +11,9 @@ export async function getDeliverables(projectId) {
   return data
 }
 
-export async function createDeliverable(payload) {
+export async function createRisk(payload) {
   const { data, error } = await supabase
-    .from('deliverables')
+    .from('risks')
     .insert(payload)
     .select()
     .single()
@@ -22,9 +22,9 @@ export async function createDeliverable(payload) {
   return data
 }
 
-export async function updateDeliverable(id, payload) {
+export async function updateRisk(id, payload) {
   const { data, error } = await supabase
-    .from('deliverables')
+    .from('risks')
     .update(payload)
     .eq('id', id)
     .select()
@@ -34,9 +34,9 @@ export async function updateDeliverable(id, payload) {
   return data
 }
 
-export async function deleteDeliverable(id) {
+export async function deleteRisk(id) {
   const { error } = await supabase
-    .from('deliverables')
+    .from('risks')
     .delete()
     .eq('id', id)
 
