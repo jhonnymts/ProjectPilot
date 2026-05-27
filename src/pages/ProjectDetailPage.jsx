@@ -1,20 +1,20 @@
-import { Package, useState } from 'react'
-import { Package, useParams, useNavigate } from 'react-router-dom'
-import { Package, useQuery } from '@tanstack/react-query'
-import { Package,
-  ArrowLeft, Layers, ShieldAlert, FileText, Users, CalendarDays, Pencil,
+import { useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  ArrowLeft, Layers, ShieldAlert, FileText,
+  Users, CalendarDays, Pencil, Package,
 } from 'lucide-react'
-import { Package, getProject } from '../api/projects'
-import { Package, getTeamMembers } from '../api/team_members'
-import { Package, formatDate, STATUS_COLORS, PRIORITY_COLORS, METHODOLOGY_COLORS, cn } from '../lib/utils'
+import { getProject, updateProject } from '../api/projects'
+import { getTeamMembers } from '../api/team_members'
+import { getTasks } from '../api/tasks'
+import { formatDate, STATUS_COLORS, PRIORITY_COLORS, METHODOLOGY_COLORS, cn } from '../lib/utils'
 import TasksTab from '../components/project-detail/TasksTab'
 import TeamTab from '../components/project-detail/TeamTab'
 import RisksTab from '../components/project-detail/RisksTab'
 import NotesTab from '../components/project-detail/NotesTab'
 import DeliverablesTab from '../components/project-detail/DeliverablesTab'
 import ProjectFormModal from '../components/projects/ProjectFormModal'
-import { Package, updateProject } from '../api/projects'
-import { Package, useQueryClient } from '@tanstack/react-query'
 
 const TABS = [
   { id: 'tasks', label: 'Tasks', icon: Layers },
@@ -30,6 +30,8 @@ export default function ProjectDetailPage() {
   const qc = useQueryClient()
   const [activeTab, setActiveTab] = useState('tasks')
   const [editModalOpen, setEditModalOpen] = useState(false)
+  const [updateLoading, setUpdateLoading] = useState(false)
+  const [updateError, setUpdateError] = useState(null)
 
   const { data: project, isLoading, error } = useQuery({
     queryKey: ['project', id],
@@ -49,17 +51,19 @@ export default function ProjectDetailPage() {
     enabled: !!id,
   })
 
-  const updateMutation = useQuery({
-    queryKey: ['project', id],
-    queryFn: () => getProject(id),
-    enabled: false,
-  })
-
   const handleUpdateProject = async (formData) => {
-    await updateProject(id, formData)
-    qc.invalidateQueries({ queryKey: ['project', id] })
-    qc.invalidateQueries({ queryKey: ['projects'] })
-    setEditModalOpen(false)
+    setUpdateLoading(true)
+    setUpdateError(null)
+    try {
+      await updateProject(id, formData)
+      qc.invalidateQueries({ queryKey: ['project', id] })
+      qc.invalidateQueries({ queryKey: ['projects'] })
+      setEditModalOpen(false)
+    } catch (err) {
+      setUpdateError(err.message)
+    } finally {
+      setUpdateLoading(false)
+    }
   }
 
   if (isLoading) {
@@ -74,7 +78,8 @@ export default function ProjectDetailPage() {
     return (
       <div className="p-8 text-center">
         <p className="text-muted-foreground text-sm">Project not found.</p>
-        <button onClick={() => navigate('/projects')} className="mt-4 text-sm text-[var(--pilot-blue)] hover:text-blue-300">
+        <button onClick={() => navigate('/projects')}
+          className="mt-4 text-sm text-[var(--pilot-blue)] hover:text-blue-300">
           ← Back to Projects
         </button>
       </div>
@@ -100,7 +105,9 @@ export default function ProjectDetailPage() {
                 {project.name}
               </h1>
               {project.description && (
-                <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{project.description}</p>
+                <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+                  {project.description}
+                </p>
               )}
               <div className="flex flex-wrap gap-2 mt-3">
                 <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full capitalize', METHODOLOGY_COLORS[project.methodology])}>
@@ -134,7 +141,10 @@ export default function ProjectDetailPage() {
           </div>
           <div className="h-1.5 rounded-full bg-[var(--pilot-surface-3)] overflow-hidden">
             <div className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${project.progress_pct ?? 0}%`, backgroundColor: project.color || '#6366f1' }} />
+              style={{
+                width: `${project.progress_pct ?? 0}%`,
+                backgroundColor: project.color || '#6366f1',
+              }} />
           </div>
         </div>
       </div>
@@ -160,16 +170,18 @@ export default function ProjectDetailPage() {
         {activeTab === 'team' && <TeamTab projectId={id} />}
         {activeTab === 'risks' && <RisksTab projectId={id} />}
         {activeTab === 'notes' && <NotesTab projectId={id} />}
-        {activeTab === 'deliverables' && <DeliverablesTab projectId={id} teamMembers={teamMembers} tasks={tasks} />}
+        {activeTab === 'deliverables' && (
+          <DeliverablesTab projectId={id} teamMembers={teamMembers} tasks={tasks} />
+        )}
       </div>
 
       {editModalOpen && (
         <ProjectFormModal
           project={project}
           onSave={handleUpdateProject}
-          onClose={() => setEditModalOpen(false)}
-          loading={false}
-          error={null}
+          onClose={() => { setEditModalOpen(false); setUpdateError(null) }}
+          loading={updateLoading}
+          error={updateError}
         />
       )}
     </div>

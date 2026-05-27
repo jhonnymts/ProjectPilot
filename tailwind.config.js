@@ -1,189 +1,74 @@
-import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  ArrowLeft, Layers, ShieldAlert, FileText,
-  Users, CalendarDays, Pencil, Package,
-} from 'lucide-react'
-import { getProject, updateProject } from '../api/projects'
-import { getTeamMembers } from '../api/team_members'
-import { getTasks } from '../api/tasks'
-import { formatDate, STATUS_COLORS, PRIORITY_COLORS, METHODOLOGY_COLORS, cn } from '../lib/utils'
-import TasksTab from '../components/project-detail/TasksTab'
-import TeamTab from '../components/project-detail/TeamTab'
-import RisksTab from '../components/project-detail/RisksTab'
-import NotesTab from '../components/project-detail/NotesTab'
-import DeliverablesTab from '../components/project-detail/DeliverablesTab'
-import ProjectFormModal from '../components/projects/ProjectFormModal'
-
-const TABS = [
-  { id: 'tasks', label: 'Tasks', icon: Layers },
-  { id: 'team', label: 'Team', icon: Users },
-  { id: 'risks', label: 'Risks', icon: ShieldAlert },
-  { id: 'notes', label: 'Notes', icon: FileText },
-  { id: 'deliverables', label: 'Deliverables', icon: Package },
-]
-
-export default function ProjectDetailPage() {
-  const { id } = useParams()
-  const navigate = useNavigate()
-  const qc = useQueryClient()
-  const [activeTab, setActiveTab] = useState('tasks')
-  const [editModalOpen, setEditModalOpen] = useState(false)
-  const [updateLoading, setUpdateLoading] = useState(false)
-  const [updateError, setUpdateError] = useState(null)
-
-  const { data: project, isLoading, error } = useQuery({
-    queryKey: ['project', id],
-    queryFn: () => getProject(id),
-    enabled: !!id,
-  })
-
-  const { data: tasks = [] } = useQuery({
-    queryKey: ['tasks', id],
-    queryFn: () => getTasks(id),
-    enabled: !!id,
-  })
-
-  const { data: teamMembers = [] } = useQuery({
-    queryKey: ['team_members', id],
-    queryFn: () => getTeamMembers(id),
-    enabled: !!id,
-  })
-
-  const handleUpdateProject = async (formData) => {
-    setUpdateLoading(true)
-    setUpdateError(null)
-    try {
-      await updateProject(id, formData)
-      qc.invalidateQueries({ queryKey: ['project', id] })
-      qc.invalidateQueries({ queryKey: ['projects'] })
-      setEditModalOpen(false)
-    } catch (err) {
-      setUpdateError(err.message)
-    } finally {
-      setUpdateLoading(false)
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-[var(--pilot-blue)] border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  if (error || !project) {
-    return (
-      <div className="p-8 text-center">
-        <p className="text-muted-foreground text-sm">Project not found.</p>
-        <button onClick={() => navigate('/projects')}
-          className="mt-4 text-sm text-[var(--pilot-blue)] hover:text-blue-300">
-          ← Back to Projects
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="p-4 md:p-6 lg:p-8 max-w-5xl mx-auto space-y-6 animate-fade-in">
-      {/* Back */}
-      <button onClick={() => navigate('/projects')}
-        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft size={15} /> Back to Projects
-      </button>
-
-      {/* Hero */}
-      <div className="pilot-surface rounded-xl p-5 md:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3 flex-1 min-w-0">
-            <div className="w-3.5 h-3.5 rounded-full shrink-0 mt-1.5"
-              style={{ backgroundColor: project.color || '#6366f1' }} />
-            <div className="flex-1 min-w-0">
-              <h1 className="font-display text-xl md:text-2xl font-700 text-foreground leading-tight">
-                {project.name}
-              </h1>
-              {project.description && (
-                <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-                  {project.description}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-2 mt-3">
-                <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full capitalize', METHODOLOGY_COLORS[project.methodology])}>
-                  {project.methodology}
-                </span>
-                <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full capitalize', STATUS_COLORS[project.status])}>
-                  {project.status.replace('_', ' ')}
-                </span>
-                <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full capitalize', PRIORITY_COLORS[project.priority])}>
-                  {project.priority} priority
-                </span>
-                {project.target_end_date && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <CalendarDays size={11} /> {formatDate(project.target_end_date)}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          <button onClick={() => setEditModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground border border-[var(--pilot-border)] hover:border-[var(--pilot-border-bright)] rounded-lg transition-all shrink-0">
-            <Pencil size={12} /> Edit
-          </button>
-        </div>
-
-        {/* Progress */}
-        <div className="mt-5">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-muted-foreground">Progress</span>
-            <span className="text-xs font-mono text-muted-foreground">{project.progress_pct ?? 0}%</span>
-          </div>
-          <div className="h-1.5 rounded-full bg-[var(--pilot-surface-3)] overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-700"
-              style={{
-                width: `${project.progress_pct ?? 0}%`,
-                backgroundColor: project.color || '#6366f1',
-              }} />
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div>
-        <div className="flex gap-1 border-b border-[var(--pilot-border)] mb-5 overflow-x-auto">
-          {TABS.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-all border-b-2 -mb-px',
-                activeTab === tab.id
-                  ? 'text-[var(--pilot-blue)] border-[var(--pilot-blue)]'
-                  : 'text-muted-foreground border-transparent hover:text-foreground'
-              )}>
-              <tab.icon size={14} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {activeTab === 'tasks' && <TasksTab projectId={id} teamMembers={teamMembers} />}
-        {activeTab === 'team' && <TeamTab projectId={id} />}
-        {activeTab === 'risks' && <RisksTab projectId={id} />}
-        {activeTab === 'notes' && <NotesTab projectId={id} />}
-        {activeTab === 'deliverables' && (
-          <DeliverablesTab projectId={id} teamMembers={teamMembers} tasks={tasks} />
-        )}
-      </div>
-
-      {editModalOpen && (
-        <ProjectFormModal
-          project={project}
-          onSave={handleUpdateProject}
-          onClose={() => { setEditModalOpen(false); setUpdateError(null) }}
-          loading={updateLoading}
-          error={updateError}
-        />
-      )}
-    </div>
-  )
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['DM Sans', 'sans-serif'],
+        display: ['Syne', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
+      colors: {
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        primary: {
+          DEFAULT: 'hsl(var(--primary))',
+          foreground: 'hsl(var(--primary-foreground))',
+        },
+        secondary: {
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
+        },
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
+        },
+        muted: {
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
+        },
+        accent: {
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
+        },
+        card: {
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
+        },
+      },
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
+      },
+      keyframes: {
+        'accordion-down': {
+          from: { height: '0' },
+          to: { height: 'var(--radix-accordion-content-height)' },
+        },
+        'accordion-up': {
+          from: { height: 'var(--radix-accordion-content-height)' },
+          to: { height: '0' },
+        },
+        'fade-in': {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        'slide-in': {
+          from: { opacity: '0', transform: 'translateX(-12px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
+      },
+      animation: {
+        'accordion-down': 'accordion-down 0.2s ease-out',
+        'accordion-up': 'accordion-up 0.2s ease-out',
+        'fade-in': 'fade-in 0.3s ease-out forwards',
+        'slide-in': 'slide-in 0.2s ease-out forwards',
+      },
+    },
+  },
+  plugins: [require('tailwindcss-animate')],
 }
