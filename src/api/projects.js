@@ -22,9 +22,12 @@ export async function getProject(id) {
 }
 
 export async function createProject(payload) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
   const { data, error } = await supabase
     .from('projects')
-    .insert(payload)
+    .insert({ ...payload, user_id: user.id })
     .select()
     .single()
 

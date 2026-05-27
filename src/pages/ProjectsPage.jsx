@@ -178,7 +178,7 @@ export default function ProjectsPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (payload) => createProject({ ...payload, user_id: user.id }),
+    mutationFn: (payload) => createProject(payload),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['projects'] }); setModalOpen(false) },
   })
 
